@@ -62,6 +62,10 @@ public class RedisLock {
      * @return
      */
     private Object getConnection() {
+        return getConnType(type, jedisConnectionFactory);
+    }
+
+    public static Object getConnType(int type, JedisConnectionFactory jedisConnectionFactory) {
         Object connection ;
         if (type == RedisToolsConstant.SINGLE){
             RedisConnection redisConnection = jedisConnectionFactory.getConnection();
@@ -111,22 +115,27 @@ public class RedisLock {
         Object connection = getConnection();
         String result ;
         for (; ;) {
-            if (connection instanceof Jedis){
-                result = ((Jedis)connection).set(lockPrefix + key, request, SET_IF_NOT_EXIST, SET_WITH_EXPIRE_TIME, 10 * TIME);
-                if (LOCK_MSG.equals(result)){
-                    ((Jedis) connection).close();
-                }
-            }else {
-                result = ((JedisCluster)connection).set(lockPrefix + key, request, SET_IF_NOT_EXIST, SET_WITH_EXPIRE_TIME, 10 * TIME);
-            }
+            result = getResultByConnType(key, request, connection);
 
             if (LOCK_MSG.equals(result)) {
                 break;
             }
-
             Thread.sleep(sleepTime);
         }
 
+    }
+
+    private String getResultByConnType(String key, String request, Object connection) {
+        String result;
+        if (connection instanceof Jedis){
+            result = ((Jedis)connection).set(lockPrefix + key, request, SET_IF_NOT_EXIST, SET_WITH_EXPIRE_TIME, 10 * TIME);
+            if (LOCK_MSG.equals(result)){
+                ((Jedis) connection).close();
+            }
+        }else {
+            result = ((JedisCluster)connection).set(lockPrefix + key, request, SET_IF_NOT_EXIST, SET_WITH_EXPIRE_TIME, 10 * TIME);
+        }
+        return result;
     }
 
     /**
@@ -144,14 +153,7 @@ public class RedisLock {
         Object connection = getConnection();
         String result ;
         while (blockTime >= 0) {
-            if (connection instanceof Jedis){
-                result = ((Jedis) connection).set(lockPrefix + key, request, SET_IF_NOT_EXIST, SET_WITH_EXPIRE_TIME, 10 * TIME) ;
-                if (LOCK_MSG.equals(result)){
-                    ((Jedis) connection).close();
-                }
-            }else {
-                result = ((JedisCluster) connection).set(lockPrefix + key, request, SET_IF_NOT_EXIST, SET_WITH_EXPIRE_TIME, 10 * TIME) ;
-            }
+            result = getResultByConnType(key, request, connection);
             if (LOCK_MSG.equals(result)) {
                 return true;
             }
@@ -200,11 +202,9 @@ public class RedisLock {
      * @return
      */
     public boolean unlock(String key, String request) {
-
         //get connection
         Object connection = getConnection();
         //lua script
-
         Object result = null;
         if (connection instanceof Jedis) {
             result = ((Jedis) connection).eval(script, Collections.singletonList(lockPrefix + key), Collections.singletonList(request));

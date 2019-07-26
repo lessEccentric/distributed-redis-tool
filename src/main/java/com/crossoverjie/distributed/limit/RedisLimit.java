@@ -1,16 +1,12 @@
 package com.crossoverjie.distributed.limit;
 
-import com.crossoverjie.distributed.constant.RedisToolsConstant;
-import com.crossoverjie.distributed.intercept.SpringMVCIntercept;
+import com.crossoverjie.distributed.lock.RedisLock;
 import com.crossoverjie.distributed.util.ScriptUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.connection.RedisClusterConnection;
-import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPool;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -86,15 +82,7 @@ public class RedisLimit {
      * @return
      */
     private Object getConnection() {
-        Object connection ;
-        if (type == RedisToolsConstant.SINGLE){
-            RedisConnection redisConnection = jedisConnectionFactory.getConnection();
-            connection = redisConnection.getNativeConnection();
-        }else {
-            RedisClusterConnection clusterConnection = jedisConnectionFactory.getClusterConnection();
-            connection = clusterConnection.getNativeConnection() ;
-        }
-        return connection;
+        return RedisLock.getConnType(type, jedisConnectionFactory);
     }
 
 
